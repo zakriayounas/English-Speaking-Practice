@@ -32,7 +32,7 @@ export default function Login() {
         ? await supabase.auth.signUp({
           email: normalizedEmail,
           password,
-          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+          options: { emailRedirectTo: `${window.location.origin}/login` },
         })
         : await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
 
