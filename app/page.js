@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 
 export default function Home() {
+  const router = useRouter();
   const [user, setUser] = useState(null), [list, setList] = useState([]), [questionCounts, setQuestionCounts] = useState({});
-  const [email, setEmail] = useState(''), [pw, setPw] = useState(''), [signup, setSignup] = useState(false), [msg, setMsg] = useState(null), [busy, setBusy] = useState(false);
   const [view, setView] = useState('list'), [listLoading, setListLoading] = useState(false), [authLoading, setAuthLoading] = useState(true), [role, setRole] = useState('learner'), [selectedLevel, setSelectedLevel] = useState('all'), [page, setPage] = useState(1);
 
   const pageSize = 15;
@@ -22,11 +23,18 @@ export default function Home() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
+      if (!data.session) router.replace('/login');
       setAuthLoading(false);
-    }).catch(() => setAuthLoading(false));
-    const { data: s } = supabase.auth.onAuthStateChange((_e, ses) => setUser(ses?.user ?? null));
+    }).catch(() => {
+      setAuthLoading(false);
+      router.replace('/login');
+    });
+    const { data: s } = supabase.auth.onAuthStateChange((_e, ses) => {
+      setUser(ses?.user ?? null);
+      if (!ses) router.replace('/login');
+    });
     return () => s.subscription.unsubscribe();
-  }, []);
+  }, [router]);
   useEffect(() => {
     if (user) {
       supabase.from('profiles').select('role').eq('id', user.id).single().then(({ data }) => setRole(data?.role || 'learner'));
@@ -45,60 +53,10 @@ export default function Home() {
     }
   }, [user]);
 
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    setMsg(null);
-    const normalizedEmail = email.trim().toLowerCase();
-    try {
-      const result = signup
-        ? await supabase.auth.signUp({ email: normalizedEmail, password: pw })
-        : await supabase.auth.signInWithPassword({ email: normalizedEmail, password: pw });
-      if (result.error) {
-        setMsg({ type: 'error', text: result.error.message });
-      } else if (signup && !result.data.session) {
-        setMsg({ type: 'success', text: 'Account created. Check your email to confirm your account, then log in.' });
-      } else if (signup) {
-        setMsg({ type: 'success', text: 'Account created. You are now signed in.' });
-      }
-    } catch (error) {
-      setMsg({ type: 'error', text: error instanceof Error ? error.message : 'Something went wrong. Please try again.' });
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (authLoading) return (
+  if (authLoading || !user) return (
     <main className="auth-shell auth-loading">
       <section className="auth-intro"><span className="eyebrow">FluentPal</span><span className="skeleton-line auth-loading-title" /><span className="skeleton-line auth-loading-copy" /></section>
       <section className="auth-card auth-loading-card"><span className="skeleton-line auth-loading-small" /><span className="skeleton-line auth-loading-heading" /><span className="skeleton-line auth-loading-input" /><span className="skeleton-line auth-loading-input" /><span className="skeleton-line auth-loading-button" /></section>
-    </main>
-  );
-
-  if (!user) return (
-    <main className="auth-shell">
-      <section className="auth-intro">
-        <span className="eyebrow">FluentPal</span>
-        <h1>Practice English with confidence.</h1>
-        <p>Practice practical English with short exercises that fit into your day.</p>
-      </section>
-      <form className="auth-card" onSubmit={submit}>
-        <div className="card-heading">
-          <span className="kicker">{signup ? 'Start learning' : 'Welcome back'}</span>
-          <h2>{signup ? 'Create your account' : 'Log in to practice'}</h2>
-          <p>{signup ? 'Save your progress and keep your momentum.' : 'Your next useful phrase is waiting.'}</p>
-        </div>
-        <label htmlFor="email">Email address</label>
-        <input id="email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" required />
-        <label htmlFor="password">Password</label>
-        <input id="password" type="password" placeholder="At least 6 characters" value={pw} onChange={e => setPw(e.target.value)} minLength={6} autoComplete={signup ? 'new-password' : 'current-password'} required />
-        <button className="primary-button" disabled={busy}>{busy ? <><span className="spinner" aria-hidden="true" />Please wait...</> : signup ? 'Create account' : 'Log in'}</button>
-        {msg && <p className={`notice notice-${msg.type}`}>{msg.text}</p>}
-        <p className="auth-switch">
-          {signup ? 'Already have an account?' : 'New to FluentPal?'}{' '}
-          <button type="button" className="text-button" onClick={() => { setSignup(!signup); setMsg(null); }}>{signup ? 'Log in' : 'Create an account'}</button>
-        </p>
-      </form>
     </main>
   );
   return (
