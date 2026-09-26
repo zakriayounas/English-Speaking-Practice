@@ -21,6 +21,7 @@ export default function Exercise() {
   const { id } = useParams();
   const [ex, setEx] = useState(null), [qs, setQs] = useState([]), [i, setI] = useState(0);
   const [ans, setAns] = useState({}), [res, setRes] = useState(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
+  const [submitError, setSubmitError] = useState('');
   const [user, setUser] = useState(null), [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
@@ -44,44 +45,58 @@ export default function Exercise() {
 
   async function submit() {
     setBusy(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    const r = await fetch('/api/submit', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
-      body: JSON.stringify({ exerciseId: id, answers: ans }),
-    });
-    const result = await r.json();
-    if (r.ok) setRes(result);
-    setBusy(false);
+    setSubmitError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setUser(null);
+        setRes({ localOnly: true });
+        return;
+      }
+      const r = await fetch('/api/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ exerciseId: id, answers: ans }),
+      });
+      const result = await r.json();
+      if (r.ok) setRes(result);
+      else setSubmitError(result.error || 'Your answers could not be submitted. Please try again.');
+    } catch {
+      setSubmitError('Your answers could not be submitted. Please try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (loading || authLoading) return <main className="exercise-page"><div className="exercise-header skeleton-header"><div><span className="skeleton-line skeleton-label" /><span className="skeleton-line skeleton-title" /></div><span className="skeleton-line skeleton-progress" /></div><section className="question-card skeleton-question"><span className="skeleton-line skeleton-prompt" />{Array.from({ length: 6 }, (_, index) => <span className="skeleton-line skeleton-option" key={index} />)}</section></main>;
   if (!ex) return <main className="exercise-page"><p>Exercise not found.</p>{user && <Link href="/">Back to exercises</Link>}</main>;
   if (res) {
+    const localOnly = res.localOnly;
     const scorePercent = res.max ? Math.round((res.score / res.max) * 100) : 0;
-    const feedback = scoreFeedback.find(item => scorePercent <= item.max) || scoreFeedback[scoreFeedback.length - 1];
-    const correctCount = qs.filter(question => res.review[question.id]?.correct).length;
-    const incorrectCount = qs.length - correctCount;
+    const feedback = localOnly
+      ? { emoji: '📝', title: 'Practice complete', message: 'This local summary has not been sent or saved. Sign in to check your answers and track progress.' }
+      : scoreFeedback.find(item => scorePercent <= item.max) || scoreFeedback[scoreFeedback.length - 1];
+    const answeredCount = Object.keys(ans).length;
+    const correctCount = localOnly ? answeredCount : qs.filter(question => res.review[question.id]?.correct).length;
+    const incorrectCount = localOnly ? qs.length - answeredCount : qs.length - correctCount;
     return (
     <main className="exercise-page">
-      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Session complete</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div><div className="exercise-header-actions"><strong className="progress-label">Score: {res.score} / {res.max}</strong></div></div>
+      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">{localOnly ? 'Local summary' : 'Session complete'}</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div><div className="exercise-header-actions">{localOnly ? <strong className="progress-label">Not submitted</strong> : <strong className="progress-label">Score: {res.score} / {res.max}</strong>}</div></div>
       <section className="feedback-banner"><span className="feedback-emoji" role="img" aria-label={feedback.title}>{feedback.emoji}</span><div><span className="kicker">You finished the exercise</span><h2>{feedback.title}</h2><p>{feedback.message}</p></div></section>
       <div className="result-workspace"><section className="result-card">
       {qs.map((q, n) => {
-        const r = res.review[q.id];
+        const r = localOnly ? null : res.review[q.id];
         return (
           <div className="result-row" key={q.id}>
             <b>{n + 1}. {q.content.prompt}</b><br />
-            {r.correct ? '✅' : '❌'} Your answer: {q.content.options[ans[q.id]] ?? '(no answer)'}<br />
-            {!r.correct && <>Correct: {q.content.options[r.answer]}<br /></>}
-            <small>{r.explanation}</small>
+            {localOnly ? <>Your answer: {q.content.options[ans[q.id]] ?? '(no answer)'}</> : <>{r.correct ? '✅' : '❌'} Your answer: {q.content.options[ans[q.id]] ?? '(no answer)'}<br />{!r.correct && <>Correct: {q.content.options[r.answer]}<br /></> }<small>{r.explanation}</small></>}
           </div>
         );
       })}
-      </section><aside className="progress-panel score-panel"><div className="progress-panel-heading"><div><span className="kicker">Final result</span><h2>Your score</h2></div><div className="progress-ring" style={{ '--progress': `${scorePercent}%` }}><strong>{scorePercent}%</strong></div></div><p className="progress-copy">You scored {res.score} out of {res.max} points.</p><div className="result-counts"><span className="correct-count"><strong>{correctCount}</strong>Correct</span><span className="incorrect-count"><strong>{incorrectCount}</strong>Incorrect</span></div><div className="question-map result-map" aria-label="Question results">{qs.map((question, index) => <span className={res.review[question.id]?.correct ? 'result-correct' : 'result-incorrect'} key={question.id}>{index + 1}</span>)}</div><div className="progress-legend"><span><i className="legend-dot answered-dot" />Correct</span><span><i className="legend-dot incorrect-dot" />Incorrect</span></div></aside></div>
+      </section><aside className="progress-panel score-panel"><div className="progress-panel-heading"><div><span className="kicker">{localOnly ? 'Answer summary' : 'Final result'}</span><h2>{localOnly ? 'Your answers' : 'Your score'}</h2></div>{!localOnly && <div className="progress-ring" style={{ '--progress': `${scorePercent}%` }}><strong>{scorePercent}%</strong></div>}</div><p className="progress-copy">{localOnly ? `${answeredCount} of ${qs.length} questions answered. Your answers remain on this device.` : `You scored ${res.score} out of ${res.max} points.`}</p><div className="result-counts"><span className="correct-count"><strong>{localOnly ? answeredCount : correctCount}</strong>{localOnly ? 'Answered' : 'Correct'}</span><span className="incorrect-count"><strong>{incorrectCount}</strong>{localOnly ? 'Unanswered' : 'Incorrect'}</span></div><div className="question-map result-map" aria-label={localOnly ? 'Answer status' : 'Question results'}>{qs.map((question, index) => <span className={localOnly ? (ans[question.id] !== undefined ? 'result-correct' : 'result-incorrect') : (res.review[question.id]?.correct ? 'result-correct' : 'result-incorrect')} key={question.id}>{index + 1}</span>)}</div><div className="progress-legend"><span><i className="legend-dot answered-dot" />{localOnly ? 'Answered' : 'Correct'}</span><span><i className="legend-dot incorrect-dot" />{localOnly ? 'Unanswered' : 'Incorrect'}</span></div></aside></div>
     </main>
     );
   }
@@ -100,7 +115,8 @@ export default function Exercise() {
               <input type="radio" name={`question-${q.id}`} checked={ans[q.id] === k} onChange={() => setAns({ ...ans, [q.id]: k })} /> {o}
             </label>
           ))}
-          <div className="exercise-actions"><button disabled={i === 0} onClick={() => setI(i - 1)}>Previous</button>{i < qs.length - 1 ? <button onClick={() => setI(i + 1)}>Next</button> : <button disabled={busy} onClick={submit}>{busy ? <><span className="spinner" aria-hidden="true" />Submitting...</> : 'Submit'}</button>}</div>
+          <div className="exercise-actions"><button disabled={i === 0} onClick={() => setI(i - 1)}>Previous</button>{i < qs.length - 1 ? <button onClick={() => setI(i + 1)}>Next</button> : <button disabled={busy} onClick={submit}>{busy ? <><span className="spinner" aria-hidden="true" />{user ? 'Submitting...' : 'Finishing...'}</> : user ? 'Submit' : 'Finish'}</button>}</div>
+          {submitError && <p role="alert">{submitError}</p>}
         </section>
         <aside className="progress-panel">
           <div className="progress-panel-heading"><div><span className="kicker">Session in progress</span><h2>Question map</h2></div></div>
