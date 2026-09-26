@@ -21,8 +21,16 @@ export default function Exercise() {
   const { id } = useParams();
   const [ex, setEx] = useState(null), [qs, setQs] = useState([]), [i, setI] = useState(0);
   const [ans, setAns] = useState({}), [res, setRes] = useState(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null), [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user ?? null);
+      setAuthLoading(false);
+    }).catch(() => setAuthLoading(false));
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
     setLoading(true);
     (async () => {
       const { data: e } = await supabase.from('exercises').select('title').eq('id', id).single();
@@ -31,26 +39,27 @@ export default function Exercise() {
       setQs(q || []);
       setLoading(false);
     })();
+    return () => authListener.subscription.unsubscribe();
   }, [id]);
 
   async function submit() {
     setBusy(true);
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      setBusy(false);
-      return;
-    }
     const r = await fetch('/api/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
       body: JSON.stringify({ exerciseId: id, answers: ans }),
     });
-    setRes(await r.json());
+    const result = await r.json();
+    if (r.ok) setRes(result);
     setBusy(false);
   }
 
-  if (loading) return <main className="exercise-page"><div className="exercise-header skeleton-header"><div><span className="skeleton-line skeleton-label" /><span className="skeleton-line skeleton-title" /></div><span className="skeleton-line skeleton-progress" /></div><section className="question-card skeleton-question"><span className="skeleton-line skeleton-prompt" />{Array.from({ length: 6 }, (_, index) => <span className="skeleton-line skeleton-option" key={index} />)}</section></main>;
-  if (!ex) return <main className="exercise-page"><p>Exercise not found.</p><Link href="/">Back to exercises</Link></main>;
+  if (loading || authLoading) return <main className="exercise-page"><div className="exercise-header skeleton-header"><div><span className="skeleton-line skeleton-label" /><span className="skeleton-line skeleton-title" /></div><span className="skeleton-line skeleton-progress" /></div><section className="question-card skeleton-question"><span className="skeleton-line skeleton-prompt" />{Array.from({ length: 6 }, (_, index) => <span className="skeleton-line skeleton-option" key={index} />)}</section></main>;
+  if (!ex) return <main className="exercise-page"><p>Exercise not found.</p>{user && <Link href="/">Back to exercises</Link>}</main>;
   if (res) {
     const scorePercent = res.max ? Math.round((res.score / res.max) * 100) : 0;
     const feedback = scoreFeedback.find(item => scorePercent <= item.max) || scoreFeedback[scoreFeedback.length - 1];
@@ -58,7 +67,7 @@ export default function Exercise() {
     const incorrectCount = qs.length - correctCount;
     return (
     <main className="exercise-page">
-      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Session complete</span><div className="exercise-title-row"><Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link><h1>{ex.title}</h1></div></div><div className="exercise-header-actions"><strong className="progress-label">Score: {res.score} / {res.max}</strong></div></div>
+      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Session complete</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div><div className="exercise-header-actions"><strong className="progress-label">Score: {res.score} / {res.max}</strong></div></div>
       <section className="feedback-banner"><span className="feedback-emoji" role="img" aria-label={feedback.title}>{feedback.emoji}</span><div><span className="kicker">You finished the exercise</span><h2>{feedback.title}</h2><p>{feedback.message}</p></div></section>
       <div className="result-workspace"><section className="result-card">
       {qs.map((q, n) => {
@@ -77,11 +86,11 @@ export default function Exercise() {
     );
   }
   const q = qs[i];
-  if (!q) return <main className="exercise-page"><p>No questions yet.</p><Link href="/">Back to exercises</Link></main>;
+  if (!q) return <main className="exercise-page"><p>No questions yet.</p>{user && <Link href="/">Back to exercises</Link>}</main>;
   const answeredCount = Object.keys(ans).length;
   return (
     <main className="exercise-page">
-      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Practice session</span><div className="exercise-title-row"><Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link><h1>{ex.title}</h1></div></div></div>
+      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Practice session</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div></div>
       <div className="exercise-workspace">
         <section className="question-card">
           <div className="question-meta"><span>Question {i + 1}</span><span>{answeredCount} answered</span></div>
