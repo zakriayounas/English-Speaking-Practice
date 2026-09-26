@@ -83,10 +83,12 @@ export default function Exercise() {
       <div className="result-workspace"><section className="result-card">
       {qs.map((q, n) => {
         const r = res.review[q.id];
+        const selectedAnswer = q.content.options[ans[q.id]] ?? '(no answer)';
         return (
           <div className="result-row" key={q.id}>
             <b>{n + 1}. {q.content.prompt}</b><br />
-            {r.correct ? '✅' : '❌'} Your answer: {q.content.options[ans[q.id]] ?? '(no answer)'}<br />{!r.correct && <>Correct: {q.content.options[r.answer]}<br />}</>}
+            {r.correct ? '✅' : '❌'} Your answer: {selectedAnswer}<br />
+            {!r.correct && <div>Correct: {q.content.options[r.answer]}</div>}
           </div>
         );
       })}
