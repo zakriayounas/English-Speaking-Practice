@@ -68,7 +68,7 @@ export default function Home() {
         supabase
           .from("exercises")
           .select("id,title,category,level,owner_id")
-          .order("title"),
+          .order("created_at", { ascending: false }),
         supabase.from("questions").select("exercise_id"),
       ])
         .then(([{ data: exerciseData }, { data: questionData }]) => {
