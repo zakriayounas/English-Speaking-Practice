@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabase';
@@ -17,12 +17,24 @@ const scoreFeedback = [
   { max: 100, emoji: '🏆', title: 'Outstanding', message: 'Brilliant work. You have mastered this exercise and built real momentum.' },
 ];
 
+function formatDuration(milliseconds) {
+  const totalSeconds = Math.floor(milliseconds / 1000);
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  const minutes = Math.floor(totalSeconds / 60);
+  if (minutes < 60) return `${String(minutes).padStart(2, '0')}:${seconds}`;
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${seconds}`;
+}
+
 export default function Exercise() {
   const { id } = useParams();
   const [ex, setEx] = useState(null), [qs, setQs] = useState([]), [i, setI] = useState(0);
   const [ans, setAns] = useState({}), [res, setRes] = useState(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
   const [submitError, setSubmitError] = useState('');
   const [user, setUser] = useState(null), [authLoading, setAuthLoading] = useState(true);
+  const [elapsedByQuestion, setElapsedByQuestion] = useState({});
+  const [clockNow, setClockNow] = useState(0);
+  const questionTimesRef = useRef({});
+  const questionStartedAtRef = useRef(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -38,14 +50,54 @@ export default function Exercise() {
       setEx(e);
       const { data: q } = await supabase.from('questions').select('id,content').eq('exercise_id', id).order('position');
       setQs(q || []);
+      questionTimesRef.current = {};
+      setElapsedByQuestion({});
+      questionStartedAtRef.current = null;
+      setClockNow(0);
       setLoading(false);
     })();
     return () => authListener.subscription.unsubscribe();
   }, [id]);
 
+  useEffect(() => {
+    if (loading || authLoading || res || !qs.length) return;
+    if (questionStartedAtRef.current === null) {
+      const startedAt = Date.now();
+      questionStartedAtRef.current = startedAt;
+      setClockNow(startedAt);
+    }
+    const interval = window.setInterval(() => setClockNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [loading, authLoading, qs.length, res]);
+
+  function recordCurrentQuestionTime(at = Date.now()) {
+    const questionId = qs[i]?.id;
+    if (!questionId || questionStartedAtRef.current === null) return questionTimesRef.current;
+
+    const lap = Math.max(0, at - questionStartedAtRef.current);
+    const updatedTimes = {
+      ...questionTimesRef.current,
+      [questionId]: (questionTimesRef.current[questionId] || 0) + lap,
+    };
+    questionTimesRef.current = updatedTimes;
+    setElapsedByQuestion(updatedTimes);
+    questionStartedAtRef.current = at;
+    return updatedTimes;
+  }
+
+  function goToQuestion(index) {
+    if (index === i || busy) return;
+    recordCurrentQuestionTime();
+    setI(index);
+  }
+
   async function submit() {
     setBusy(true);
     setSubmitError('');
+    let submittedSuccessfully = false;
+    const submittedAt = Date.now();
+    const questionTimes = recordCurrentQuestionTime(submittedAt);
+    const totalTime = Object.values(questionTimes).reduce((total, time) => total + time, 0);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -60,11 +112,19 @@ export default function Exercise() {
         body: JSON.stringify({ exerciseId: id, answers: ans }),
       });
       const result = await r.json();
-      if (r.ok) setRes(result);
+      if (r.ok) {
+        submittedSuccessfully = true;
+        setRes({ ...result, timing: { questionTimes, totalTime } });
+      }
       else setSubmitError(result.error || 'Your answers could not be submitted. Please try again.');
     } catch {
       setSubmitError('Your answers could not be submitted. Please try again.');
     } finally {
+      if (!submittedSuccessfully) {
+        const resumedAt = Date.now();
+        questionStartedAtRef.current = resumedAt;
+        setClockNow(resumedAt);
+      }
       setBusy(false);
     }
   }
@@ -87,37 +147,40 @@ export default function Exercise() {
         return (
           <div className="result-row" key={q.id}>
             <b>{n + 1}. {q.content.prompt}</b><br />
+            <small>Time on question: {formatDuration(res.timing.questionTimes[q.id] || 0)}</small>
             {r.correct ? '✅' : '❌'} Your answer: {selectedAnswer}<br />
             {!r.correct && <div>Correct: {q.content.options[r.answer]}</div>}
           </div>
         );
       })}
-      </section><aside className="progress-panel score-panel"><div className="progress-panel-heading"><div><span className="kicker">Final result</span><h2>Your score</h2></div><div className="progress-ring" style={{ '--progress': `${scorePercent}%` }}><strong>{scorePercent}%</strong></div></div><p className="progress-copy">You scored {res.score} out of {res.max} points.</p><div className="result-counts"><span className="correct-count"><strong>{correctCount}</strong>Correct</span><span className="incorrect-count"><strong>{incorrectCount}</strong>Incorrect</span></div><div className="question-map result-map" aria-label="Question results">{qs.map((question, index) => <span className={res.review[question.id]?.correct ? 'result-correct' : 'result-incorrect'} key={question.id}>{index + 1}</span>)}</div><div className="progress-legend"><span><i className="legend-dot answered-dot" />Correct</span><span><i className="legend-dot incorrect-dot" />Incorrect</span></div></aside></div>
+      </section><aside className="progress-panel score-panel"><div className="progress-panel-heading"><div><span className="kicker">Final result</span><h2>Your score</h2></div><div className="progress-ring" style={{ '--progress': `${scorePercent}%` }}><strong>{scorePercent}%</strong></div></div><p className="progress-copy">You scored {res.score} out of {res.max} points.</p><p className="summary-time"><span>Total time</span><strong>{formatDuration(res.timing.totalTime)}</strong></p><div className="result-counts"><span className="correct-count"><strong>{correctCount}</strong>Correct</span><span className="incorrect-count"><strong>{incorrectCount}</strong>Incorrect</span></div><div className="question-map result-map" aria-label="Question results">{qs.map((question, index) => <span className={res.review[question.id]?.correct ? 'result-correct' : 'result-incorrect'} key={question.id}>{index + 1}</span>)}</div><div className="progress-legend"><span><i className="legend-dot answered-dot" />Correct</span><span><i className="legend-dot incorrect-dot" />Incorrect</span></div></aside></div>
     </main>
     );
   }
   const q = qs[i];
   if (!q) return <main className="exercise-page"><p>No questions yet.</p>{user && <Link href="/">Back to exercises</Link>}</main>;
   const answeredCount = Object.keys(ans).length;
+  const activeQuestionTime = (elapsedByQuestion[q.id] || 0) + (questionStartedAtRef.current === null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
+  const totalElapsedTime = Object.values(elapsedByQuestion).reduce((total, time) => total + time, 0) + (questionStartedAtRef.current === null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
   return (
     <main className="exercise-page">
-      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Practice session</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div></div>
+      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Practice session</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div><div className="exercise-header-actions"><strong className="progress-label">Time elapsed: {formatDuration(totalElapsedTime)}</strong></div></div>
       <div className="exercise-workspace">
         <section className="question-card">
-          <div className="question-meta"><span>Question {i + 1}</span><span>{answeredCount} answered</span></div>
+          <div className="question-meta"><span>Question {i + 1}</span><span>{answeredCount} answered</span><span>Question time: {formatDuration(activeQuestionTime)}</span></div>
           <h2>{q.content.prompt}</h2>
           {q.content.options.map((o, k) => (
             <label className="answer-option" key={k}>
               <input type="radio" name={`question-${q.id}`} checked={ans[q.id] === k} onChange={() => setAns({ ...ans, [q.id]: k })} /> {o}
             </label>
           ))}
-          <div className="exercise-actions"><button disabled={i === 0} onClick={() => setI(i - 1)}>Previous</button>{i < qs.length - 1 ? <button onClick={() => setI(i + 1)}>Next</button> : <button disabled={busy} onClick={submit}>{busy ? <><span className="spinner" aria-hidden="true" />Submitting...</> : 'Submit'}</button>}</div>
+          <div className="exercise-actions"><button disabled={i === 0 || busy} onClick={() => goToQuestion(i - 1)}>Previous</button>{i < qs.length - 1 ? <button disabled={busy} onClick={() => goToQuestion(i + 1)}>Next</button> : <button disabled={busy} onClick={submit}>{busy ? <><span className="spinner" aria-hidden="true" />Submitting...</> : 'Submit'}</button>}</div>
           {submitError && <p role="alert">{submitError}</p>}
         </section>
         <aside className="progress-panel">
           <div className="progress-panel-heading"><div><span className="kicker">Session in progress</span><h2>Question map</h2></div></div>
           <p className="progress-copy">{answeredCount} of {qs.length} answered. Choose any question to review or change your answer.</p>
-          <div className="question-map" aria-label="Choose a question">{qs.map((question, index) => <button className={`${index === i ? 'current ' : ''}${ans[question.id] !== undefined ? 'answered' : ''}`} key={question.id} onClick={() => setI(index)} aria-label={`Go to question ${index + 1}`} aria-current={index === i ? 'step' : undefined}>{index + 1}</button>)}</div>
+          <div className="question-map" aria-label="Choose a question">{qs.map((question, index) => <button className={`${index === i ? 'current ' : ''}${ans[question.id] !== undefined ? 'answered' : ''}`} key={question.id} onClick={() => goToQuestion(index)} aria-label={`Go to question ${index + 1}`} aria-current={index === i ? 'step' : undefined}>{index + 1}</button>)}</div>
           <div className="progress-legend"><span><i className="legend-dot answered-dot" />Attempted</span><span><i className="legend-dot" />Not started</span></div>
         </aside>
       </div>
