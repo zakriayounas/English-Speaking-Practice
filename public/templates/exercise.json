@@ -1,0 +1,31 @@
+{
+  "title": "Starting a standup",
+  "category": "workplace-english",
+  "level": "beginner",
+  "targetMinutes": 5,
+  "visibility": "members",
+  "questions": [
+    {
+      "prompt": "Your teammate asks, \"Want to lead the standup?\"\nYou were late. What do you say?",
+      "options": [
+        "Sorry I'm late. I'll keep this short.",
+        "Whatever, just start without a plan.",
+        "You should have waited for me.",
+        "I have nothing to add, honestly."
+      ],
+      "answer": "A",
+      "explanation": "\"Sorry I'm late\" takes responsibility without stopping the meeting.\n**I'll keep this short** shows you respect everyone's time.\n\nUse this when you still want to contribute."
+    },
+    {
+      "prompt": "A colleague says the release \"slipped\".\nWhat does that usually mean?",
+      "options": [
+        "The release moved to a later time.",
+        "The release was cancelled forever.",
+        "Someone dropped the server.",
+        "The team finished early."
+      ],
+      "answer": "A",
+      "explanation": "In software teams, **slipped** means the date moved later.\nIt does not mean the work was thrown away."
+    }
+  ]
+}

@@ -1,7 +1,8 @@
 import './globals.css';
+import AppShell from '../components/AppShell';
 
-export const metadata = { title: 'English Practice' };
+export const metadata = { title: 'FluentPal' };
 
 export default function RootLayout({ children }) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body><AppShell>{children}</AppShell></body></html>;
 }

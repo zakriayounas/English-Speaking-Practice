@@ -24,9 +24,9 @@ function makeQuestion(p) {
 
 for (let s = 0; s * 10 < bank.length; s++) {
   const chunk = bank.slice(s * 10, s * 10 + 10);
-  const { data: ex } = await db.from('exercises').insert({ title: `Business Phrases - Set ${s + 1}`, category: 'Idioms & phrases', published: true }).select('id').single();
+  const { data: ex } = await db.from('exercises').insert({ title: `Business Phrases - Set ${s + 1}`, category: 'Idioms and Native Phrases', level: 'beginner', visibility: 'public', published: true, status: 'published' }).select('id').single();
   const made = chunk.map(makeQuestion);
-  const { data: qs } = await db.from('questions').insert(made.map((m, i) => ({ exercise_id: ex.id, position: i + 1, type: 'mcq', content: m.content }))).select('id,position').order('position');
+  const { data: qs } = await db.from('questions').insert(made.map((m, i) => ({ exercise_id: ex.id, position: i + 1, type: 'mcq', prompt: m.content.prompt, content: m.content }))).select('id,position').order('position');
   await db.from('question_keys').insert(qs.map((q, i) => ({ question_id: q.id, answer: made[i].answer, explanation: made[i].explanation })));
   console.log('Created set', s + 1);
 }

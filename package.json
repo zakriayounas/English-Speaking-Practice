@@ -1,11 +1,13 @@
 {
   "name": "english-practice",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "seed": "node --env-file=.env.local scripts/seed.mjs"
+    "seed": "node --env-file=.env.local scripts/seed.mjs",
+    "test": "node --test tests/templates.test.js tests/stats.test.js tests/categories.test.js tests/bulk-upload.test.mjs tests/shuffle-exercise-answers.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2",
@@ -13,6 +15,8 @@
     "mammoth": "^1.12.3",
     "next": "^15",
     "react": "^19",
-    "react-dom": "^19"
+    "react-dom": "^19",
+    "react-select": "^5.10.2",
+    "recharts": "^3.10.1"
   }
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../lib/supabase';
+import PasswordField from '../../components/PasswordField';
 
 export default function ResetPassword() {
   const [email, setEmail] = useState('');
@@ -84,9 +85,9 @@ export default function ResetPassword() {
           <input id="reset-email" type="email" placeholder="you@example.com" value={email} onChange={event => setEmail(event.target.value)} autoComplete="email" required />
         </> : <>
           <label htmlFor="new-password">New password</label>
-          <input id="new-password" type="password" placeholder="At least 6 characters" value={password} onChange={event => setPassword(event.target.value)} minLength={6} autoComplete="new-password" required />
+          <PasswordField id="new-password" placeholder="At least 6 characters" value={password} onChange={event => setPassword(event.target.value)} minLength={6} autoComplete="new-password" required />
           <label htmlFor="new-password-again">Confirm new password</label>
-          <input id="new-password-again" type="password" placeholder="Enter it again" value={passwordAgain} onChange={event => setPasswordAgain(event.target.value)} minLength={6} autoComplete="new-password" required />
+          <PasswordField id="new-password-again" placeholder="Enter it again" value={passwordAgain} onChange={event => setPasswordAgain(event.target.value)} minLength={6} autoComplete="new-password" required />
         </>}
         <button className="primary-button" disabled={busy}>{busy ? <><span className="spinner" aria-hidden="true" />Please wait...</> : recovery ? 'Update password' : 'Send reset link'}</button>
         {message && <p className={`notice notice-${message.type}`}>{message.text}</p>}

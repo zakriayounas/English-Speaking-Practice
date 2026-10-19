@@ -1,189 +1,291 @@
 'use client';
+
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabase';
+import { useAppShell } from '../../../components/AppShell';
+import RichText from '../../../components/RichText';
+import { formatDuration, formatTarget } from '../../../lib/format';
 
 const scoreFeedback = [
-  { max: 9, emoji: '🌱', title: 'A fresh start', message: 'Every attempt builds your English. Review the answers and try again when you are ready.' },
-  { max: 19, emoji: '🧭', title: 'Keep finding your way', message: 'You have started the journey. A little more practice will make these phrases familiar.' },
-  { max: 29, emoji: '🔎', title: 'Keep exploring', message: 'You are noticing new patterns. Focus on one phrase at a time and keep moving forward.' },
-  { max: 39, emoji: '🛠️', title: 'Building your skills', message: 'Your practice is taking shape. Review the tricky answers and give this set another go.' },
-  { max: 49, emoji: '🚀', title: 'Almost halfway there', message: 'You are close to the next milestone. A focused review can make a big difference.' },
-  { max: 59, emoji: '🌤️', title: 'Nice progress', message: 'You are building a useful foundation. Keep practicing to make these phrases stick.' },
-  { max: 69, emoji: '💪', title: 'Strong work', message: 'Your confidence is growing. Keep this rhythm and the next level is within reach.' },
-  { max: 79, emoji: '🎉', title: 'Great job', message: 'You handled most of the exercise very well. Keep sharpening the few phrases that challenged you.' },
+  { max: 39, emoji: '🌱', title: 'A fresh start', message: 'Review the explanations and try the tricky questions again.' },
+  { max: 69, emoji: '🌤️', title: 'Nice progress', message: 'You are building a useful foundation. Keep the phrases that challenged you.' },
   { max: 89, emoji: '⭐', title: 'Excellent work', message: 'Your practice is paying off. You have a strong command of this exercise.' },
-  { max: 100, emoji: '🏆', title: 'Outstanding', message: 'Brilliant work. You have mastered this exercise and built real momentum.' },
+  { max: 100, emoji: '🏆', title: 'Outstanding', message: 'Brilliant work. You have built real momentum.' },
 ];
-
-function formatDuration(milliseconds) {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-  const seconds = String(totalSeconds % 60).padStart(2, '0');
-  const minutes = Math.floor(totalSeconds / 60);
-  if (minutes < 60) return `${String(minutes).padStart(2, '0')}:${seconds}`;
-  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${seconds}`;
-}
 
 export default function Exercise() {
   const { id } = useParams();
-  const [ex, setEx] = useState(null), [qs, setQs] = useState([]), [i, setI] = useState(0);
-  const [ans, setAns] = useState({}), [res, setRes] = useState(null), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true);
+  const shell = useAppShell();
+  const [exercise, setExercise] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [submitError, setSubmitError] = useState('');
-  const [user, setUser] = useState(null), [authLoading, setAuthLoading] = useState(true);
   const [elapsedByQuestion, setElapsedByQuestion] = useState({});
   const [clockNow, setClockNow] = useState(0);
+  const [nextExercise, setNextExercise] = useState(null);
   const questionTimesRef = useRef({});
   const questionStartedAtRef = useRef(null);
+  const attemptStartedAtRef = useRef(null);
+  const targetSecondsRef = useRef(null);
+  const submittedRef = useRef(false);
+
+  const showTimer = shell?.profile?.show_timer !== false;
+  const user = shell?.user || null;
+
+  function questionPrompt(question) {
+    return question.prompt || question.content?.prompt || '';
+  }
+
+  function questionOptions(question) {
+    return question.content?.options || question.options || [];
+  }
+
+  function stopClock(at = Date.now()) {
+    const questionId = questions[index]?.id;
+    if (!questionId || questionStartedAtRef.current == null) return questionTimesRef.current;
+    const updated = {
+      ...questionTimesRef.current,
+      [questionId]: (questionTimesRef.current[questionId] || 0) + Math.max(0, at - questionStartedAtRef.current),
+    };
+    questionTimesRef.current = updated;
+    setElapsedByQuestion(updated);
+    questionStartedAtRef.current = null;
+    return updated;
+  }
+
+  function startClock(at = Date.now()) {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    questionStartedAtRef.current = at;
+    setClockNow(at);
+  }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setAuthLoading(false);
-    }).catch(() => setAuthLoading(false));
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    let ignore = false;
     setLoading(true);
+    submittedRef.current = false;
     (async () => {
-      const { data: e } = await supabase.from('exercises').select('title').eq('id', id).single();
-      setEx(e);
-      const { data: q } = await supabase.from('questions').select('id,content').eq('exercise_id', id).order('position');
-      setQs(q || []);
+      const [{ data: loadedExercise }, { data: loadedQuestions }] = await Promise.all([
+        supabase.from('exercises').select('id,title,level,visibility,target_seconds,category_id').eq('id', id).maybeSingle(),
+        supabase.from('questions').select('id,position,prompt,content').eq('exercise_id', id).order('position'),
+      ]);
+      if (ignore) return;
+      setExercise(loadedExercise);
+      setQuestions(loadedQuestions || []);
       questionTimesRef.current = {};
-      setElapsedByQuestion({});
       questionStartedAtRef.current = null;
-      setClockNow(0);
+      attemptStartedAtRef.current = new Date().toISOString();
+      targetSecondsRef.current = loadedExercise?.target_seconds || null;
+      setElapsedByQuestion({});
+      setResult(null);
+      setAnswers({});
+      setIndex(0);
       setLoading(false);
     })();
-    return () => authListener.subscription.unsubscribe();
+    return () => { ignore = true; };
   }, [id]);
 
   useEffect(() => {
-    if (loading || authLoading || res || !qs.length) return;
-    if (questionStartedAtRef.current === null) {
-      const startedAt = Date.now();
-      questionStartedAtRef.current = startedAt;
-      setClockNow(startedAt);
-    }
+    if (loading || result || !questions.length) return undefined;
+    startClock();
     const interval = window.setInterval(() => setClockNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [loading, authLoading, qs.length, res]);
+    return () => window.clearInterval(interval);
+  }, [loading, result, questions.length, index]);
 
-  function recordCurrentQuestionTime(at = Date.now()) {
-    const questionId = qs[i]?.id;
-    if (!questionId || questionStartedAtRef.current === null) return questionTimesRef.current;
+  useEffect(() => {
+    if (loading || result || !questions.length) return undefined;
+    function onVisibility() {
+      if (document.hidden) stopClock();
+      else startClock();
+    }
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [loading, result, questions.length, index]);
 
-    const lap = Math.max(0, at - questionStartedAtRef.current);
-    const updatedTimes = {
-      ...questionTimesRef.current,
-      [questionId]: (questionTimesRef.current[questionId] || 0) + lap,
-    };
-    questionTimesRef.current = updatedTimes;
-    setElapsedByQuestion(updatedTimes);
-    questionStartedAtRef.current = at;
-    return updatedTimes;
-  }
-
-  function goToQuestion(index) {
-    if (index === i || busy) return;
-    recordCurrentQuestionTime();
-    setI(index);
+  function goToQuestion(nextIndex) {
+    if (nextIndex === index || busy) return;
+    stopClock();
+    setIndex(nextIndex);
   }
 
   async function submit() {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
     setBusy(true);
     setSubmitError('');
-    let submittedSuccessfully = false;
-    const submittedAt = Date.now();
-    const questionTimes = recordCurrentQuestionTime(submittedAt);
-    const totalTime = Object.values(questionTimes).reduce((total, time) => total + time, 0);
+    const questionTimes = stopClock();
+    const durationMs = Object.values(questionTimes).reduce((total, time) => total + time, 0);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setUser(null);
-      }
-      const r = await fetch('/api/submit', {
+      const response = await fetch('/api/submit', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ exerciseId: id, answers: ans }),
+        headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+        body: JSON.stringify({
+          exerciseId: id,
+          answers,
+          timing: { startedAt: attemptStartedAtRef.current, durationMs, questionTimes, targetSeconds: targetSecondsRef.current },
+        }),
       });
-      const result = await r.json();
-      if (r.ok) {
-        submittedSuccessfully = true;
-        setRes({ ...result, timing: { questionTimes, totalTime } });
-      }
-      else setSubmitError(result.error || 'Your answers could not be submitted. Please try again.');
-    } catch {
-      setSubmitError('Your answers could not be submitted. Please try again.');
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Your answers could not be submitted.');
+      submittedRef.current = true;
+      setResult({ ...payload, timing: { questionTimes, totalTime: durationMs } });
+      if (exercise?.category_id) {
+        const { data } = await supabase.from('exercises').select('id,title').eq('category_id', exercise.category_id).neq('id', id).limit(1);
+        setNextExercise(data?.[0] || payload.nextExercise || null);
+      } else setNextExercise(payload.nextExercise || null);
+    } catch (error) {
+      submittedRef.current = false;
+      setSubmitError(error.message);
+      startClock();
     } finally {
-      if (!submittedSuccessfully) {
-        const resumedAt = Date.now();
-        questionStartedAtRef.current = resumedAt;
-        setClockNow(resumedAt);
-      }
       setBusy(false);
     }
   }
 
-  if (loading || authLoading) return <main className="exercise-page"><div className="exercise-header skeleton-header"><div><span className="skeleton-line skeleton-label" /><span className="skeleton-line skeleton-title" /></div><span className="skeleton-line skeleton-progress" /></div><section className="question-card skeleton-question"><span className="skeleton-line skeleton-prompt" />{Array.from({ length: 6 }, (_, index) => <span className="skeleton-line skeleton-option" key={index} />)}</section></main>;
-  if (!ex) return <main className="exercise-page"><p>Exercise not found.</p>{user && <Link href="/">Back to exercises</Link>}</main>;
-  if (res) {
-    const scorePercent = res.max ? Math.round((res.score / res.max) * 100) : 0;
-    const feedback = scoreFeedback.find(item => scorePercent <= item.max) || scoreFeedback[scoreFeedback.length - 1];
-    const correctCount = qs.filter(question => res.review[question.id]?.correct).length;
-    const incorrectCount = qs.length - correctCount;
+  function retry() {
+    submittedRef.current = false;
+    questionTimesRef.current = {};
+    questionStartedAtRef.current = null;
+    attemptStartedAtRef.current = new Date().toISOString();
+    setElapsedByQuestion({});
+    setAnswers({});
+    setIndex(0);
+    setResult(null);
+    setNextExercise(null);
+  }
+
+  if (loading || (shell && !shell.ready)) {
+    return <main className="exercise-page"><div className="skeleton-card" /><div className="skeleton-card" /></main>;
+  }
+  if (!exercise) {
     return (
-    <main className="exercise-page">
-      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">{res.publicAttempt ? 'Public attempt' : 'Session complete'}</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div><div className="exercise-header-actions"><strong className="progress-label">Score: {res.score} / {res.max}</strong></div></div>
-      <section className="feedback-banner"><span className="feedback-emoji" role="img" aria-label={feedback.title}>{feedback.emoji}</span><div><span className="kicker">You finished the exercise</span><h2>{feedback.title}</h2><p>{feedback.message}</p></div></section>
-      <div className="result-workspace"><section className="result-card">
-      {qs.map((q, n) => {
-        const r = res.review[q.id];
-        const selectedAnswer = q.content.options[ans[q.id]] ?? '(no answer)';
-        return (
-          <div className="result-row" key={q.id}>
-            <b>{n + 1}. {q.content.prompt}</b><br />
-            <small>Time on question: {formatDuration(res.timing.questionTimes[q.id] || 0)}</small>
-            {r.correct ? '✅' : '❌'} Your answer: {selectedAnswer}<br />
-            {!r.correct && <div>Correct: {q.content.options[r.answer]}</div>}
-          </div>
-        );
-      })}
-      </section><aside className="progress-panel score-panel"><div className="progress-panel-heading"><div><span className="kicker">Final result</span><h2>Your score</h2></div><div className="progress-ring" style={{ '--progress': `${scorePercent}%` }}><strong>{scorePercent}%</strong></div></div><p className="progress-copy">You scored {res.score} out of {res.max} points.</p><p className="summary-time"><span>Total time</span><strong>{formatDuration(res.timing.totalTime)}</strong></p><div className="result-counts"><span className="correct-count"><strong>{correctCount}</strong>Correct</span><span className="incorrect-count"><strong>{incorrectCount}</strong>Incorrect</span></div><div className="question-map result-map" aria-label="Question results">{qs.map((question, index) => <span className={res.review[question.id]?.correct ? 'result-correct' : 'result-incorrect'} key={question.id}>{index + 1}</span>)}</div><div className="progress-legend"><span><i className="legend-dot answered-dot" />Correct</span><span><i className="legend-dot incorrect-dot" />Incorrect</span></div></aside></div>
-    </main>
+      <main className="exercise-page">
+        <section className="section-empty-state">
+          <strong>This exercise is unavailable</strong>
+          <p>It may be for members, or it may have been removed.</p>
+          {!user && <Link className="primary-button inline-cta" href={`/login?next=/exercise/${id}`}>Log in</Link>}
+          <Link className="back-button" href="/exercises">Back to exercises</Link>
+        </section>
+      </main>
     );
   }
-  const q = qs[i];
-  if (!q) return <main className="exercise-page"><p>No questions yet.</p>{user && <Link href="/">Back to exercises</Link>}</main>;
-  const answeredCount = Object.keys(ans).length;
-  const activeQuestionTime = (elapsedByQuestion[q.id] || 0) + (questionStartedAtRef.current === null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
-  const totalElapsedTime = Object.values(elapsedByQuestion).reduce((total, time) => total + time, 0) + (questionStartedAtRef.current === null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
+
+  if (result) {
+    const scorePercent = result.max ? Math.round((result.score / result.max) * 100) : 0;
+    const feedback = scoreFeedback.find(item => scorePercent <= item.max) || scoreFeedback.at(-1);
+    const times = questions.map(question => result.timing.questionTimes[question.id] || 0);
+    const average = questions.length ? times.reduce((total, time) => total + time, 0) / questions.length : 0;
+    const slowestIndex = times.reduce((best, time, timeIndex) => time > times[best] ? timeIndex : best, 0);
+    const targetLabel = formatTarget(result.targetSeconds);
+    const metTarget = result.targetSeconds ? result.timing.totalTime <= result.targetSeconds * 1000 : null;
+    return (
+      <main className="exercise-page">
+        <div className="exercise-header">
+          <div>
+            <span className="eyebrow">{result.publicAttempt ? 'Practice summary' : 'Saved attempt'}</span>
+            <h1>{exercise.title}</h1>
+          </div>
+        </div>
+        <section className="feedback-banner">
+          <span className="feedback-emoji" role="img" aria-label={feedback.title}>{feedback.emoji}</span>
+          <div><span className="kicker">Score {result.score} / {result.max}</span><h2>{feedback.title}</h2><p>{feedback.message}</p></div>
+        </section>
+        <div className="result-workspace">
+          <section className="result-card">
+            {questions.map((question, questionIndex) => {
+              const review = result.review[question.id] || {};
+              const options = questionOptions(question);
+              return (
+                <div className="result-row" key={question.id}>
+                  <RichText className="question-prompt" text={`${questionIndex + 1}. ${questionPrompt(question)}`} />
+                  <small>Time on question: {formatDuration(result.timing.questionTimes[question.id] || 0)}</small>
+                  <div>{review.correct ? 'Correct' : 'Not quite'} — your answer: {options[answers[question.id]] ?? '(no answer)'}</div>
+                  {!review.correct && <div>Answer: {options[review.answer] ?? ''}</div>}
+                  <RichText className="explanation-text" text={review.explanation || ''} />
+                </div>
+              );
+            })}
+          </section>
+          <aside className="progress-panel">
+            <h2>Your result</h2>
+            <p className="summary-time"><span>Score</span><strong>{scorePercent}%</strong></p>
+            <p className="summary-time"><span>Time</span><strong>{formatDuration(result.timing.totalTime)}</strong></p>
+            {targetLabel && <p className="summary-time"><span>Target {targetLabel}</span><strong>{metTarget ? 'Met' : 'Over'}</strong></p>}
+            <p className="summary-time"><span>Average per question</span><strong>{formatDuration(average)}</strong></p>
+            {questions[slowestIndex] && <p className="progress-copy">Slowest question: {slowestIndex + 1} ({formatDuration(times[slowestIndex])})</p>}
+            <div className="result-actions">
+              <button type="button" className="primary-button" onClick={retry}>Retry</button>
+              {nextExercise && <Link className="ghost-button" href={`/exercise/${nextExercise.id}`}>Next: {nextExercise.title}</Link>}
+            </div>
+            {result.publicAttempt && <p className="progress-copy">Create an account to save this score and track your progress. <Link href={`/register?next=/exercise/${id}`}>Sign up</Link></p>}
+          </aside>
+        </div>
+      </main>
+    );
+  }
+
+  const question = questions[index];
+  if (!question) return <main className="exercise-page"><p>No questions yet.</p><Link href="/exercises">Back to exercises</Link></main>;
+  const active = (elapsedByQuestion[question.id] || 0) + (questionStartedAtRef.current == null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
+  const total = Object.values(elapsedByQuestion).reduce((sum, time) => sum + time, 0) + (questionStartedAtRef.current == null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
+  const targetLabel = formatTarget(exercise.target_seconds);
+
   return (
     <main className="exercise-page">
-      <div className="exercise-header"><div className="exercise-title-group"><span className="eyebrow">Practice session</span><div className="exercise-title-row">{user && <Link className="back-button icon-button" href="/" aria-label="Back to exercises" title="Back to exercises"><span aria-hidden="true">&#8592;</span></Link>}<h1>{ex.title}</h1></div></div><div className="exercise-header-actions"><strong className="progress-label">Time elapsed: {formatDuration(totalElapsedTime)}</strong></div></div>
+      <div className="exercise-header">
+        <div className="exercise-title-group">
+          <span className="eyebrow">Practice session</span>
+          <div className="exercise-title-row">
+            <Link className="back-button icon-button" href="/exercises" aria-label="Back to exercises"><span aria-hidden="true">←</span></Link>
+            <h1 title={exercise.title}>{exercise.title}</h1>
+          </div>
+        </div>
+        {showTimer && (
+          <div className="exercise-header-actions">
+            <strong className="progress-label">Time {formatDuration(total)}{targetLabel ? ` · Target ${targetLabel}` : ''}</strong>
+          </div>
+        )}
+      </div>
       <div className="exercise-workspace">
         <section className="question-card">
-          <div className="question-meta"><span>Question {i + 1}</span><span>{answeredCount} answered</span><span>Question time: {formatDuration(activeQuestionTime)}</span></div>
-          <h2>{q.content.prompt}</h2>
-          {q.content.options.map((o, k) => (
-            <label className="answer-option" key={k}>
-              <input type="radio" name={`question-${q.id}`} checked={ans[q.id] === k} onChange={() => setAns({ ...ans, [q.id]: k })} /> {o}
+          <div className="question-meta">
+            <span>Question {index + 1}</span>
+            <span>{Object.keys(answers).length} answered</span>
+            {showTimer && <span>Question time {formatDuration(active)}</span>}
+          </div>
+          <RichText className="question-prompt" text={questionPrompt(question)} />
+          {questionOptions(question).map((option, optionIndex) => (
+            <label className="answer-option" key={optionIndex}>
+              <input type="radio" name={`question-${question.id}`} checked={answers[question.id] === optionIndex} onChange={() => setAnswers(current => ({ ...current, [question.id]: optionIndex }))} />
+              {option}
             </label>
           ))}
-          <div className="exercise-actions"><button disabled={i === 0 || busy} onClick={() => goToQuestion(i - 1)}>Previous</button>{i < qs.length - 1 ? <button disabled={busy} onClick={() => goToQuestion(i + 1)}>Next</button> : <button disabled={busy} onClick={submit}>{busy ? <><span className="spinner" aria-hidden="true" />Submitting...</> : 'Submit'}</button>}</div>
-          {submitError && <p role="alert">{submitError}</p>}
+          <div className="exercise-actions">
+            <button type="button" disabled={index === 0 || busy} onClick={() => goToQuestion(index - 1)}>Previous</button>
+            {index < questions.length - 1
+              ? <button type="button" disabled={busy} onClick={() => goToQuestion(index + 1)}>Next</button>
+              : <button type="button" disabled={busy} onClick={submit}>{busy ? 'Saving...' : 'Finish'}</button>}
+          </div>
+          {submitError && <p className="notice notice-error" role="alert">{submitError}</p>}
         </section>
         <aside className="progress-panel">
-          <div className="progress-panel-heading"><div><span className="kicker">Session in progress</span><h2>Question map</h2></div></div>
-          <p className="progress-copy">{answeredCount} of {qs.length} answered. Choose any question to review or change your answer.</p>
-          <div className="question-map" aria-label="Choose a question">{qs.map((question, index) => <button className={`${index === i ? 'current ' : ''}${ans[question.id] !== undefined ? 'answered' : ''}`} key={question.id} onClick={() => goToQuestion(index)} aria-label={`Go to question ${index + 1}`} aria-current={index === i ? 'step' : undefined}>{index + 1}</button>)}</div>
-          <div className="progress-legend"><span><i className="legend-dot answered-dot" />Attempted</span><span><i className="legend-dot" />Not started</span></div>
+          <h2>Question map</h2>
+          <div className="question-map" aria-label="Choose a question">
+            {questions.map((item, itemIndex) => (
+              <button type="button" key={item.id} className={`${itemIndex === index ? 'current ' : ''}${answers[item.id] !== undefined ? 'answered' : ''}`} onClick={() => goToQuestion(itemIndex)} aria-current={itemIndex === index ? 'step' : undefined}>{itemIndex + 1}</button>
+            ))}
+          </div>
+          {targetLabel && <p className="progress-copy">Target time is a guide. You can finish whenever you are ready.</p>}
         </aside>
       </div>
     </main>
   );
 }
+
+
