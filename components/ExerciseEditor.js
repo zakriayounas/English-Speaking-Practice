@@ -110,6 +110,12 @@ export default function ExerciseEditor({ mode = 'create', exerciseId = '' }) {
   }, [dirty]);
 
   useEffect(() => {
+    if (!message) return undefined;
+    const timeout = window.setTimeout(() => setMessage(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [message]);
+
+  useEffect(() => {
     if (mode === 'create') setDirty(Boolean(title || categoryId || level || targetMinutes || questions.length || paste));
     else if (snapshot.current) setDirty(JSON.stringify(form) !== snapshot.current);
   }, [title, categoryId, level, targetMinutes, visibility, questions, paste, mode]);
@@ -378,7 +384,12 @@ export default function ExerciseEditor({ mode = 'create', exerciseId = '' }) {
         </section>
         {mode === 'edit' && actions}
       </form>}
-      {message && <div className={`toast toast-${message.type}`} role="status"><span>{message.text}</span><button type="button" aria-label="Dismiss notification" onClick={() => setMessage(null)}>×</button></div>}
+      {message && (
+        <div className={`toast toast-${message.type}`} role={message.type === 'error' ? 'alert' : 'status'}>
+          <span>{message.text}</span>
+          <button className="toast-close" type="button" aria-label="Dismiss notification" onClick={() => setMessage(null)}>×</button>
+        </div>
+      )}
       {confirmDelete && (
         <div className="modal-backdrop" role="presentation">
           <section className="confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-title">

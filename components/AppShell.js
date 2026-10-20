@@ -148,9 +148,9 @@ export default function AppShell({ children }) {
           <nav id="site-nav" aria-label="Main">
             <Link className={navClass('/exercises')} href="/exercises" aria-current={navClass('/exercises') ? 'page' : undefined}>Exercises</Link>
             {user && <Link className={navClass(role === 'admin' ? '/admin' : '/profile')} href={role === 'admin' ? '/admin' : '/profile'} aria-current={navClass(role === 'admin' ? '/admin' : '/profile') ? 'page' : undefined}>Progress</Link>}
+            {role === 'admin' && <Link className="nav-add-exercise" href="/add">Add exercise</Link>}
           </nav>
           <div className="header-tools">
-            {role === 'admin' && <Link className="ghost-button" href="/add">Add exercise</Link>}
             <div className="user-menu" ref={menuRef}>
               {user ? (
                 <>

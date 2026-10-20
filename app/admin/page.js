@@ -173,7 +173,6 @@ export default function Admin() {
           <p>See who is practicing, how often, and which exercises are available.</p>
         </div>
         <div className="admin-links">
-          <Link className="primary-button" href="/add">Add exercise</Link>
           <Link className="back-link back-button" href="/">Library</Link>
         </div>
       </header>
@@ -183,10 +182,12 @@ export default function Admin() {
         <div><strong>{data.exercises.length}</strong><span>Exercises</span></div>
       </div>
       <section className="admin-section">
-        <div className="section-heading"><h2>Learner progress</h2></div>
-        <div className="admin-filters">
-          <AppSelect instanceId="admin-category" inputId="admin-category" label="Category" options={[{ value: '', label: 'All categories' }, ...(data.categories || []).map(item => ({ value: item.slug, label: item.name }))]} value={category} onChange={setCategory} />
-          <AppSelect instanceId="admin-level" inputId="admin-level" label="Level" options={[{ value: '', label: 'All levels' }, { value: 'beginner', label: 'Beginner' }, { value: 'intermediate', label: 'Intermediate' }, { value: 'advanced', label: 'Advanced' }]} value={level} onChange={setLevel} />
+        <div className="section-heading admin-progress-heading">
+          <h2>Learner progress</h2>
+          <div className="admin-filters">
+            <AppSelect instanceId="admin-category" inputId="admin-category" ariaLabel="Filter learner progress by category" options={[{ value: '', label: 'All categories' }, ...(data.categories || []).map(item => ({ value: item.slug, label: item.name }))]} value={category} onChange={setCategory} />
+            <AppSelect instanceId="admin-level" inputId="admin-level" ariaLabel="Filter learner progress by level" options={[{ value: '', label: 'All levels' }, { value: 'beginner', label: 'Beginner' }, { value: 'intermediate', label: 'Intermediate' }, { value: 'advanced', label: 'Advanced' }]} value={level} onChange={setLevel} />
+          </div>
         </div>
         {learnerRows.length ? (
           <div className="admin-table" role="table" aria-label="Learner progress">
@@ -200,17 +201,19 @@ export default function Admin() {
             </div>
             {learnerRows.map(learner => (
               <div className="admin-row admin-row-progress-columns" role="row" key={learner.id}>
-                <strong className="learner-name-cell" role="cell">
-                  <span
-                    className="learner-medal"
-                    aria-label={rankedLearnerPositions.has(learner.id) ? `Rank ${rankedLearnerPositions.get(learner.id)}` : undefined}
-                    aria-hidden={!rankedLearnerPositions.has(learner.id)}
-                  >
-                    {rankedLearnerPositions.has(learner.id) ? learnerMedals[rankedLearnerPositions.get(learner.id) - 1] : ''}
+                <div className="learner-name-cell" role="cell">
+                  <span className="learner-name-line">
+                    <span
+                      className="learner-medal"
+                      aria-label={rankedLearnerPositions.has(learner.id) ? `Rank ${rankedLearnerPositions.get(learner.id)}` : undefined}
+                      aria-hidden={!rankedLearnerPositions.has(learner.id)}
+                    >
+                      {rankedLearnerPositions.has(learner.id) ? learnerMedals[rankedLearnerPositions.get(learner.id) - 1] : ''}
+                    </span>
+                    <strong>{learner.full_name || 'Learner'}</strong>
                   </span>
-                  {learner.full_name || 'Learner'}
                   {learner.email && <small className="secondary-email">{learner.email}</small>}
-                </strong>
+                </div>
                 <span role="cell">{learner.attempts}</span>
                 <span role="cell">{learner.average}%</span>
                 <span role="cell">{formatDuration(learner.averageQuestionMs)}</span>
@@ -234,7 +237,13 @@ export default function Admin() {
         )}
       </section>
       <section className="admin-section">
-        <div className="section-heading"><h2>Exercise progress</h2></div>
+        <div className="section-heading admin-progress-heading">
+          <h2>Exercise progress</h2>
+          <div className="admin-filters">
+            <AppSelect instanceId="admin-exercise-category" inputId="admin-exercise-category" ariaLabel="Filter exercise progress by category" options={[{ value: '', label: 'All categories' }, ...(data.categories || []).map(item => ({ value: item.slug, label: item.name }))]} value={category} onChange={setCategory} />
+            <AppSelect instanceId="admin-exercise-level" inputId="admin-exercise-level" ariaLabel="Filter exercise progress by level" options={[{ value: '', label: 'All levels' }, { value: 'beginner', label: 'Beginner' }, { value: 'intermediate', label: 'Intermediate' }, { value: 'advanced', label: 'Advanced' }]} value={level} onChange={setLevel} />
+          </div>
+        </div>
         {exerciseProgressRows.length ? (
           <div className="admin-table" role="table" aria-label="Exercise progress">
             <div className="admin-row admin-row-header admin-row-six-columns" role="row">

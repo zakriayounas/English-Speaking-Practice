@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import mammoth from 'mammoth';
 import { parseExercise, applyCategory } from '../lib/exercise-parse.js';
 import { splitInlineMarkup } from '../lib/rich-text.js';
+import { GET as downloadTemplate } from '../app/api/exercises/template/route.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const templateDir = path.join(root, 'public', 'templates');
@@ -52,6 +53,21 @@ test('static template files exist and are not generated in application code', ()
   assert.match(editor, /\/templates\/exercise\.txt/);
   assert.match(editor, /\/templates\/exercise\.json/);
   assert.match(editor, /\/templates\/exercise\.docx/);
+});
+
+test('template download responds with an attachment instead of redirecting', async () => {
+  for (const [format, filename] of [
+    ['txt', 'exercise.txt'],
+    ['md', 'exercise.md'],
+    ['json', 'exercise.json'],
+    ['docx', 'exercise.docx'],
+  ]) {
+    const response = await downloadTemplate(new Request(`http://localhost/api/exercises/template?format=${format}`));
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-disposition'), `attachment; filename="${filename}"`);
+    assert.equal(response.headers.get('location'), null);
+    assert.ok((await response.arrayBuffer()).byteLength > 0);
+  }
 });
 
 test('text, markdown, and json templates parse to the same exercise', () => {

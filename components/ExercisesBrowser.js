@@ -194,8 +194,12 @@ export default function ExercisesBrowser() {
     <main className="dashboard">
       {!categorySlug && (
         <header className="page-intro">
-          <h1>Choose a topic</h1>
-          <p>Pick a category, then practice with a short exercise.</p>
+          <h1>Find your next exercise</h1>
+          <p>
+            {recommendations.length > 0
+              ? 'Browse by topic or try a fresh recommendation matched to your interests and level.'
+              : 'Browse topics to find practical exercises for your English.'}
+          </p>
         </header>
       )}
       {error && (
@@ -211,10 +215,7 @@ export default function ExercisesBrowser() {
           {recommendations.length > 0 && (
             <section className="recommend-section">
               <div className="section-heading">
-                <div>
-                  <h2>New recommendations for you</h2>
-                  <p>Untried exercises matched to your interests and level.</p>
-                </div>
+                <h2>Recommended for you: fresh picks based on your interests and level</h2>
               </div>
               <div className="exercise-grid exercise-list-view">
                 {recommendations.map((exercise, index) => exerciseCard(exercise, index))}

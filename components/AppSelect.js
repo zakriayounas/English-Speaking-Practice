@@ -39,6 +39,7 @@ export default function AppSelect({
   instanceId,
   inputId,
   label,
+  ariaLabel,
   options,
   value,
   onChange,
@@ -66,6 +67,7 @@ export default function AppSelect({
         isMulti={isMulti}
         isDisabled={isDisabled}
         placeholder={placeholder}
+        aria-label={ariaLabel}
         styles={styles}
         menuPortalTarget={mounted ? document.body : null}
         menuPosition="fixed"
