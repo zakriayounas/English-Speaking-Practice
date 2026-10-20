@@ -26,6 +26,7 @@ export default function ExercisesBrowser() {
   const [exercises, setExercises] = useState([]);
   const [counts, setCounts] = useState({});
   const [lastScores, setLastScores] = useState({});
+  const [attemptedExerciseIds, setAttemptedExerciseIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchDraft, setSearchDraft] = useState(params.get('q') || '');
@@ -79,17 +80,33 @@ export default function ExercisesBrowser() {
       nextCounts[exercise.id] = exercise.questions?.[0]?.count || 0;
     });
     const scores = {};
+    const attemptedIds = new Set();
     if (user) {
-      const { data: attempts } = await supabase.from('attempts').select('exercise_id,score,max_score,submitted_at').order('submitted_at', { ascending: false });
-      (attempts || []).forEach(attempt => {
-        if (attempt.exercise_id && scores[attempt.exercise_id] == null) scores[attempt.exercise_id] = scorePercent(attempt);
-      });
+      for (let offset = 0; ; offset += 1000) {
+        const { data: attempts, error: attemptsError } = await supabase.from('attempts')
+          .select('exercise_id,score,max_score,submitted_at')
+          .order('submitted_at', { ascending: false })
+          .range(offset, offset + 999);
+        if (request !== requestRef.current) return;
+        if (attemptsError) {
+          setError(`Your exercise history could not be loaded. ${attemptsError.message}`);
+          setLoading(false);
+          return;
+        }
+        (attempts || []).forEach(attempt => {
+          if (!attempt.exercise_id) return;
+          attemptedIds.add(attempt.exercise_id);
+          if (scores[attempt.exercise_id] == null) scores[attempt.exercise_id] = scorePercent(attempt);
+        });
+        if (!attempts || attempts.length < 1000) break;
+      }
     }
     if (request !== requestRef.current) return;
     setCategories(categoryResult.data || []);
     setExercises(visible);
     setCounts(nextCounts);
     setLastScores(scores);
+    setAttemptedExerciseIds(attemptedIds);
     loadedRef.current = true;
     setLoading(false);
   }
@@ -116,11 +133,11 @@ export default function ExercisesBrowser() {
         const rank = (categoryMatch ? 2 : 0) + (levelMatch ? 1 : 0);
         return { exercise, rank };
       })
-      .filter(item => item.rank > 0)
+      .filter(item => item.rank > 0 && !attemptedExerciseIds.has(item.exercise.id))
       .sort((a, b) => b.rank - a.rank || a.exercise.title.localeCompare(b.exercise.title))
       .slice(0, 4)
       .map(item => item.exercise);
-  }, [exercises, hasPreferences, preferred, preferredLevel]);
+  }, [attemptedExerciseIds, exercises, hasPreferences, preferred, preferredLevel]);
 
   const recommendationIds = new Set(recommendations.map(exercise => exercise.id));
   const categoryExercises = exercises.filter(exercise => {
@@ -193,7 +210,12 @@ export default function ExercisesBrowser() {
         <>
           {recommendations.length > 0 && (
             <section className="recommend-section">
-              <div className="section-heading"><h2>Recommended for you</h2></div>
+              <div className="section-heading">
+                <div>
+                  <h2>New recommendations for you</h2>
+                  <p>Untried exercises matched to your interests and level.</p>
+                </div>
+              </div>
               <div className="exercise-grid exercise-list-view">
                 {recommendations.map((exercise, index) => exerciseCard(exercise, index))}
               </div>
