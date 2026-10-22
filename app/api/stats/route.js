@@ -6,6 +6,7 @@ function normalize(attempt) {
   const category = exercise.categories || {};
   return {
     id: attempt.id,
+    exerciseId: attempt.exercise_id,
     score: attempt.score,
     max_score: attempt.max_score,
     duration_ms: attempt.duration_ms,
@@ -45,6 +46,7 @@ export async function GET(request) {
     chart,
     recent: normalized.slice(0, 8).map(attempt => ({
       id: attempt.id,
+      exerciseId: attempt.exerciseId,
       exerciseTitle: attempt.exerciseTitle,
       score: attempt.score,
       maxScore: attempt.max_score,

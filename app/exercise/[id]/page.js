@@ -158,6 +158,7 @@ export default function Exercise() {
     setIndex(0);
     setResult(null);
     setNextExercise(null);
+    if (!result) startClock();
   }
 
   if (loading || (shell && !shell.ready)) {
@@ -167,10 +168,9 @@ export default function Exercise() {
     return (
       <main className="exercise-page">
         <section className="section-empty-state">
-          <strong>This exercise is unavailable</strong>
-          <p>It may be for members, or it may have been removed.</p>
-          {!user && <Link className="primary-button inline-cta" href={`/login?next=/exercise/${id}`}>Log in</Link>}
-          <Link className="back-button" href="/exercises">Back to exercises</Link>
+          <strong>This exercise could not be found</strong>
+          <p>It may no longer exist, or the link may be incorrect. You can find another exercise to practice instead.</p>
+          <Link className="primary-button inline-cta" href="/exercises">Browse exercises</Link>
         </section>
       </main>
     );
@@ -235,6 +235,9 @@ export default function Exercise() {
   const active = (elapsedByQuestion[question.id] || 0) + (questionStartedAtRef.current == null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
   const total = Object.values(elapsedByQuestion).reduce((sum, time) => sum + time, 0) + (questionStartedAtRef.current == null ? 0 : Math.max(0, clockNow - questionStartedAtRef.current));
   const targetLabel = formatTarget(exercise.target_seconds);
+  const timerValue = targetSecondsRef.current
+    ? Math.max(0, targetSecondsRef.current * 1000 - total)
+    : total;
 
   return (
     <main className="exercise-page">
@@ -246,18 +249,33 @@ export default function Exercise() {
             <h1 title={exercise.title}>{exercise.title}</h1>
           </div>
         </div>
-        {showTimer && (
-          <div className="exercise-header-actions">
-            <strong className="progress-label">Time {formatDuration(total)}{targetLabel ? ` · Target ${targetLabel}` : ''}</strong>
-          </div>
-        )}
+        <div className="exercise-header-actions">
+          {showTimer && (
+            <strong className="progress-label">
+              <svg className="clock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+              {targetLabel ? 'Time left' : 'Time elapsed'}: {formatDuration(timerValue)}
+            </strong>
+          )}
+          <button type="button" className="ghost-button restart-button" onClick={retry} disabled={busy} aria-label="Restart exercise and clear your answers">Restart</button>
+        </div>
       </div>
       <div className="exercise-workspace">
         <section className="question-card">
           <div className="question-meta">
             <span>Question {index + 1}</span>
             <span>{Object.keys(answers).length} answered</span>
-            {showTimer && <span>Question time {formatDuration(active)}</span>}
+            {showTimer && (
+              <span className="question-time">
+                <svg className="clock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+                Question time {formatDuration(active)}
+              </span>
+            )}
           </div>
           <RichText className="question-prompt" text={questionPrompt(question)} />
           {questionOptions(question).map((option, optionIndex) => (
@@ -287,5 +305,3 @@ export default function Exercise() {
     </main>
   );
 }
-
-

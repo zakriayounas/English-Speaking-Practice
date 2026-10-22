@@ -116,6 +116,7 @@ export default function AppShell({ children }) {
 
   const profile = account?.profile || null;
   const role = profile?.role || 'learner';
+  const progressHref = role === 'admin' ? '/admin' : '/progress';
   const showNav = !hiddenNav.has(pathname);
   const email = account?.email || user?.email || '';
   const name = profile?.full_name?.trim() || user?.user_metadata?.full_name?.trim() || email.split('@')[0] || 'Account';
@@ -147,7 +148,7 @@ export default function AppShell({ children }) {
           <Link className="site-brand" href="/exercises">FluentPal</Link>
           <nav id="site-nav" aria-label="Main">
             <Link className={navClass('/exercises')} href="/exercises" aria-current={navClass('/exercises') ? 'page' : undefined}>Exercises</Link>
-            {user && <Link className={navClass(role === 'admin' ? '/admin' : '/profile')} href={role === 'admin' ? '/admin' : '/profile'} aria-current={navClass(role === 'admin' ? '/admin' : '/profile') ? 'page' : undefined}>Progress</Link>}
+            {user && <Link className={navClass(progressHref)} href={progressHref} aria-current={navClass(progressHref) ? 'page' : undefined}>Progress</Link>}
             {role === 'admin' && <Link className="nav-add-exercise" href="/add">Add exercise</Link>}
           </nav>
           <div className="header-tools">
@@ -163,7 +164,6 @@ export default function AppShell({ children }) {
                         <strong>{name}</strong>
                         {email && <span className="secondary-email">{email}</span>}
                       </div>
-                      <Link href="/profile" role="menuitem">Profile</Link>
                       <Link href="/settings" role="menuitem">Settings</Link>
                       <button type="button" role="menuitem" onClick={signOut}>Sign out</button>
                     </div>

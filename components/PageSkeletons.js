@@ -85,47 +85,42 @@ export function ExerciseFiltersSkeleton({ view = 'list' }) {
 
 export function ProfileProgressSkeleton() {
   return (
-    <div className="profile-progress" aria-hidden="true">
+    <div className="profile-progress-loading" aria-hidden="true">
       <div className="admin-stats">
         {Array.from({ length: 4 }, (_, index) => <div className="skeleton-card profile-stat-skeleton" key={index} />)}
       </div>
-      <section className="edit-exercise-card">
-        <span className="skeleton-line profile-skeleton-heading" />
-        <span className="skeleton-line profile-chart-skeleton" />
-      </section>
-      <section className="edit-exercise-card">
-        <span className="skeleton-line profile-skeleton-heading" />
-        <span className="skeleton-line profile-row-skeleton" />
-        <span className="skeleton-line profile-row-skeleton" />
-        <span className="skeleton-line profile-row-skeleton" />
-      </section>
+      <div className="profile-progress-sections">
+        <section className="admin-section profile-chart-section">
+          <span className="skeleton-line section-skeleton-heading" />
+          <span className="skeleton-line profile-chart-skeleton" />
+        </section>
+        <section className="admin-section">
+          <span className="skeleton-line section-skeleton-heading" />
+          <span className="skeleton-line profile-row-skeleton" />
+          <span className="skeleton-line profile-row-skeleton" />
+        </section>
+        <section className="admin-section">
+          <span className="skeleton-line section-skeleton-heading" />
+          <span className="skeleton-line profile-row-skeleton" />
+          <span className="skeleton-line profile-row-skeleton" />
+          <span className="skeleton-line profile-row-skeleton" />
+        </section>
+      </div>
     </div>
   );
 }
 
-export function ProfileSkeleton() {
+export function ProgressPageSkeleton() {
   return (
-    <main className="dashboard" aria-busy="true" aria-label="Loading profile">
-      <header className="profile-header">
-        <span className="skeleton-line profile-skeleton-avatar" />
+    <main className="admin-page profile-page" aria-busy="true" aria-label="Loading progress">
+      <header className="author-header">
         <div>
-          <span className="skeleton-line profile-skeleton-name" />
-          <span className="skeleton-line profile-skeleton-email" />
-          <span className="skeleton-line profile-skeleton-meta" />
+          <span className="skeleton-line progress-skeleton-title" />
+          <span className="skeleton-line progress-skeleton-meta" />
         </div>
+        <span className="skeleton-line admin-skeleton-button" />
       </header>
-      <div className="profile-layout">
-        <section className="edit-exercise-card profile-form">
-          <span className="skeleton-line profile-skeleton-heading" />
-          <div className="profile-fields">
-            <FieldSkeleton />
-            <FieldSkeleton />
-            <FieldSkeleton />
-          </div>
-          <span className="skeleton-line profile-skeleton-button" />
-        </section>
-        <ProfileProgressSkeleton />
-      </div>
+      <ProfileProgressSkeleton />
     </main>
   );
 }
@@ -135,13 +130,26 @@ export function SettingsSkeleton() {
     <main className="dashboard" aria-busy="true" aria-label="Loading settings">
       <header className="page-intro"><span className="skeleton-line settings-skeleton-title" /></header>
       <section className="edit-exercise-card settings-form">
-        <div className="settings-fields">
-          <FieldSkeleton />
-          <FieldSkeleton />
-          <FieldSkeleton />
-          <FieldSkeleton />
+        <div className="settings-sections">
+          <section className="settings-section">
+            <span className="skeleton-line section-skeleton-heading" />
+            <div className="settings-fields">
+              <FieldSkeleton />
+              <FieldSkeleton />
+              <FieldSkeleton />
+            </div>
+          </section>
+          <section className="settings-section">
+            <span className="skeleton-line section-skeleton-heading" />
+            <div className="settings-fields">
+              <FieldSkeleton />
+              <FieldSkeleton />
+              <FieldSkeleton />
+              <FieldSkeleton />
+            </div>
+            <span className="skeleton-line settings-check-skeleton" />
+          </section>
         </div>
-        <span className="skeleton-line settings-check-skeleton" />
         <span className="skeleton-line settings-skeleton-button" />
       </section>
     </main>

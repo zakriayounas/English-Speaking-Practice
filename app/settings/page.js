@@ -6,12 +6,14 @@ import { supabase } from '../../lib/supabase';
 import { useAppShell } from '../../components/AppShell';
 import AppSelect from '../../components/AppSelect';
 import { LEARNING_GOALS } from '../../lib/goals';
+import { formatDate } from '../../lib/format';
 import { SettingsSkeleton } from '../../components/PageSkeletons';
 
 export default function SettingsPage() {
   const router = useRouter();
   const shell = useAppShell();
   const [categories, setCategories] = useState([]);
+  const [name, setName] = useState('');
   const [level, setLevel] = useState('');
   const [categoryIds, setCategoryIds] = useState([]);
   const [goals, setGoals] = useState([]);
@@ -30,6 +32,7 @@ export default function SettingsPage() {
   }, [shell?.ready, shell?.user, router]);
 
   useEffect(() => {
+    setName(shell?.profile?.full_name || '');
     setLevel(shell?.profile?.english_level || '');
     setCategoryIds(shell?.categoryIds || []);
     setGoals(shell?.goals || []);
@@ -50,6 +53,7 @@ export default function SettingsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
       body: JSON.stringify({
+        full_name: name,
         english_level: level || null,
         categoryIds,
         goals,
@@ -72,20 +76,41 @@ export default function SettingsPage() {
     <main className="dashboard">
       <header className="page-intro"><h1>Settings</h1></header>
       <form className="edit-exercise-card settings-form" onSubmit={save}>
-        <div className="settings-fields">
-          <AppSelect instanceId="settings-level" inputId="settings-level" label="English level" options={[{ value: '', label: 'Not sure yet' }, { value: 'beginner', label: 'Beginner' }, { value: 'intermediate', label: 'Intermediate' }, { value: 'advanced', label: 'Advanced' }]} value={level} onChange={setLevel} />
-          <AppSelect instanceId="settings-categories" inputId="settings-categories" label="Preferred categories" options={categories.map(category => ({ value: category.id, label: category.name }))} isMulti value={categoryIds} onChange={setCategoryIds} />
-          <AppSelect instanceId="settings-goals" inputId="settings-goals" label="Learning goals" options={LEARNING_GOALS} isMulti value={goals} onChange={setGoals} />
-          <label htmlFor="daily-goal">Daily goal in minutes
-            <input id="daily-goal" inputMode="numeric" value={dailyGoal} onChange={event => setDailyGoal(event.target.value)} placeholder="Optional" />
-          </label>
+        <div className="settings-sections">
+          <section className="settings-section">
+            <h2>Profile details</h2>
+            <div className="settings-fields">
+              <label htmlFor="profile-name">Full name
+                <input id="profile-name" value={name} onChange={event => setName(event.target.value)} required />
+              </label>
+              <div className="settings-readonly-field">
+                <span>Email address</span>
+                <strong>{shell.email || '—'}</strong>
+              </div>
+              <div className="settings-readonly-field">
+                <span>Member since</span>
+                <strong>{formatDate(shell.profile?.created_at)}</strong>
+              </div>
+            </div>
+          </section>
+          <section className="settings-section">
+            <h2>Practice preferences</h2>
+            <div className="settings-fields">
+              <AppSelect instanceId="settings-categories" inputId="settings-categories" label="Preferred categories" options={categories.map(category => ({ value: category.id, label: category.name }))} isMulti value={categoryIds} onChange={setCategoryIds} />
+              <AppSelect instanceId="settings-level" inputId="settings-level" label="English level" options={[{ value: '', label: 'Not sure yet' }, { value: 'beginner', label: 'Beginner' }, { value: 'intermediate', label: 'Intermediate' }, { value: 'advanced', label: 'Advanced' }]} value={level} onChange={setLevel} />
+              <AppSelect instanceId="settings-goals" inputId="settings-goals" label="Learning goals" options={LEARNING_GOALS} isMulti value={goals} onChange={setGoals} />
+              <label htmlFor="daily-goal">Daily goal in minutes
+                <input id="daily-goal" inputMode="numeric" value={dailyGoal} onChange={event => setDailyGoal(event.target.value)} placeholder="Optional" />
+              </label>
+            </div>
+            <label className="check-row" htmlFor="show-timer">
+              <input id="show-timer" type="checkbox" checked={showTimer} onChange={event => setShowTimer(event.target.checked)} />
+              Show the timer during an attempt
+            </label>
+          </section>
         </div>
-        <label className="check-row" htmlFor="show-timer">
-          <input id="show-timer" type="checkbox" checked={showTimer} onChange={event => setShowTimer(event.target.checked)} />
-          Show the timer during an attempt
-        </label>
         <div className="paste-actions">
-          <button className="primary-button profile-save" disabled={busy}>{busy ? 'Saving...' : 'Save settings'}</button>
+          <button className="primary-button profile-save" disabled={busy}>{busy ? 'Saving...' : 'Save changes'}</button>
         </div>
         {message && <p className={`notice notice-${message.type}`} role="status">{message.text}</p>}
       </form>
