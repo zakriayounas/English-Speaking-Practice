@@ -2,16 +2,27 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import { useAppShell } from './AppShell';
 import AppSelect from './AppSelect';
 import { formatTarget } from '../lib/format';
-import { CategoryGridSkeleton, ExerciseFiltersSkeleton } from './PageSkeletons';
+import { ExercisesHomeSkeleton, ExerciseFiltersSkeleton } from './PageSkeletons';
 
 const PAGE_SIZE = 15;
-const READY_IMAGES = new Set();
+const CATEGORY_IMAGES = new Set([
+  'daily-conversation',
+  'grammar-mistakes',
+  'idioms-phrases',
+  'ielts-speaking',
+  'listening-pronunciation',
+  'phrasal-verbs-collocations',
+  'reading-writing',
+  'speaking-conversation',
+  'software-dev-communication',
+  'vocabulary-synonyms',
+  'workplace-english',
+]);
 
 function scorePercent(attempt) {
   if (!attempt?.max_score) return null;
@@ -30,8 +41,11 @@ export default function ExercisesBrowser() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchDraft, setSearchDraft] = useState(params.get('q') || '');
+  const [activeCategoryArea, setActiveCategoryArea] = useState('all');
   const loadedRef = useRef(false);
   const requestRef = useRef(0);
+  const recommendationsRef = useRef(null);
+  const [recommendationScroll, setRecommendationScroll] = useState({ left: false, right: false });
 
   const categorySlug = (params.get('category') || '').split(',')[0].trim();
   const level = params.get('level') || 'all';
@@ -135,11 +149,34 @@ export default function ExercisesBrowser() {
       })
       .filter(item => item.rank > 0 && !attemptedExerciseIds.has(item.exercise.id))
       .sort((a, b) => b.rank - a.rank || a.exercise.title.localeCompare(b.exercise.title))
-      .slice(0, 4)
+      .slice(0, 8)
       .map(item => item.exercise);
   }, [attemptedExerciseIds, exercises, hasPreferences, preferred, preferredLevel]);
 
+  useEffect(() => {
+    const track = recommendationsRef.current;
+    if (!track) return undefined;
+    const updateScrollState = () => {
+      setRecommendationScroll({
+        left: track.scrollLeft > 1,
+        right: track.scrollLeft + track.clientWidth < track.scrollWidth - 1,
+      });
+    };
+    updateScrollState();
+    track.addEventListener('scroll', updateScrollState, { passive: true });
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    resizeObserver.observe(track);
+    return () => {
+      track.removeEventListener('scroll', updateScrollState);
+      resizeObserver.disconnect();
+    };
+  }, [recommendations.length]);
+
   const recommendationIds = new Set(recommendations.map(exercise => exercise.id));
+  const categoryAreas = [...new Set(categories.map(item => item.area || 'Categories'))];
+  const displayedCategories = activeCategoryArea === 'all'
+    ? categories
+    : categories.filter(item => (item.area || 'Categories') === activeCategoryArea);
   const categoryExercises = exercises.filter(exercise => {
     if (category && exercise.category_id !== category.id) return false;
     if (!category && recommendationIds.has(exercise.id)) return false;
@@ -190,6 +227,12 @@ export default function ExercisesBrowser() {
     );
   }
 
+  function scrollRecommendations(direction) {
+    const track = recommendationsRef.current;
+    if (!track) return;
+    track.scrollBy({ left: direction * track.clientWidth * 0.85, behavior: 'smooth' });
+  }
+
   return (
     <main className="dashboard">
       {!categorySlug && (
@@ -209,51 +252,58 @@ export default function ExercisesBrowser() {
           <button type="button" className="primary-button inline-cta" onClick={load}>Retry</button>
         </div>
       )}
-      {loading && !error && (categorySlug ? <ExerciseFiltersSkeleton view={view} /> : <CategoryGridSkeleton />)}
+      {loading && !error && (categorySlug ? <ExerciseFiltersSkeleton view={view} /> : <ExercisesHomeSkeleton />)}
       {!loading && !error && !categorySlug && (
         <>
           {recommendations.length > 0 && (
             <section className="recommend-section">
-              <div className="section-heading">
-                <h2>Recommended for you: fresh picks based on your interests and level</h2>
+              <div className="section-heading recommendation-heading">
+                <div>
+                  <h2>Recommended for you</h2>
+                  <span>Fresh picks matched to your interests and level.</span>
+                </div>
+                <div className="recommendation-controls" aria-label="Recommendation navigation">
+                  <button type="button" aria-label="Show previous recommendations" onClick={() => scrollRecommendations(-1)} disabled={!recommendationScroll.left}>←</button>
+                  <button type="button" aria-label="Show more recommendations" onClick={() => scrollRecommendations(1)} disabled={!recommendationScroll.right}>→</button>
+                </div>
               </div>
-              <div className="exercise-grid exercise-list-view">
+              <div className="exercise-grid exercise-grid-view recommendation-track" ref={recommendationsRef} role="region" tabIndex={0} aria-label="Recommended exercises">
                 {recommendations.map((exercise, index) => exerciseCard(exercise, index))}
               </div>
             </section>
           )}
-          {Array.from(categories.reduce((groups, item) => {
-            const area = item.area || 'Categories';
-            if (!groups.has(area)) groups.set(area, []);
-            groups.get(area).push(item);
-            return groups;
-          }, new Map())).map(([area, items]) => (
-            <section className="category-group" key={area} aria-label={area}>
-              <div className="section-heading"><h2>{area}</h2></div>
+          {categories.length > 0 && (
+            <section className="category-group explore-categories" aria-labelledby="explore-categories-heading">
+              <div className="explore-categories-heading">
+                <div>
+                  <h2 id="explore-categories-heading">Explore categories</h2>
+                  <span>Choose a topic to practice.</span>
+                </div>
+              </div>
+              <div className="category-area-tabs" role="group" aria-label="Filter categories by topic">
+                <button type="button" className={activeCategoryArea === 'all' ? 'active' : ''} aria-pressed={activeCategoryArea === 'all'} onClick={() => setActiveCategoryArea('all')}>All topics</button>
+                {categoryAreas.map(area => (
+                  <button key={area} type="button" className={activeCategoryArea === area ? 'active' : ''} aria-pressed={activeCategoryArea === area} onClick={() => setActiveCategoryArea(area)}>{area}</button>
+                ))}
+              </div>
               <div className="category-grid">
-                {items.map(item => {
+                {displayedCategories.map(item => {
                   const related = exercises.filter(exercise => exercise.category_id === item.id);
-                  const done = related.filter(exercise => lastScores[exercise.id] != null).length;
-                  const showImage = item.image_path && READY_IMAGES.has(item.slug);
+                  const showImage = CATEGORY_IMAGES.has(item.slug);
                   return (
                     <button key={item.id} type="button" className="category-card" onClick={() => replaceParams({ category: item.slug, page: 1 })}>
                       {showImage
-                        ? <Image src={item.image_path} alt={`${item.name} exercises`} width={800} height={450} className="category-image" />
+                        ? <span className="category-image" aria-hidden="true" style={{ backgroundImage: `url("/categories/${item.slug}.png")` }} />
                         : <span className="category-fallback" aria-hidden="true" />}
                       <strong>{item.name}</strong>
                       <span>{item.description}</span>
-                      <small>{related.length} {related.length === 1 ? 'exercise' : 'exercises'}</small>
-                      {user && related.length > 0 && (
-                        <span className="level-progress" aria-label={`${done} of ${related.length} practiced`}>
-                          <span style={{ width: `${Math.round((done / related.length) * 100)}%` }} />
-                        </span>
-                      )}
+                      <small>{related.length} {related.length === 1 ? 'exercise' : 'exercises'} <span className="category-card-arrow" aria-hidden="true">→</span></small>
                     </button>
                   );
                 })}
               </div>
             </section>
-          ))}
+          )}
           {!categories.length && <div className="section-empty-state"><strong>No categories yet</strong><p>Add categories in the database, then refresh this page.</p></div>}
         </>
       )}

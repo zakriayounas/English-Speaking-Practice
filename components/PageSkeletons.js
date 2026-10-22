@@ -42,7 +42,39 @@ export function ExercisesHomeSkeleton() {
         <span className="skeleton-line page-skeleton-title" />
         <span className="skeleton-line page-skeleton-copy" />
       </header>
-      <CategoryGridSkeleton />
+      <section className="recommend-section" aria-hidden="true">
+        <div className="recommendation-skeleton-heading">
+          <span className="skeleton-line recommendation-skeleton-title" />
+          <span className="skeleton-line recommendation-skeleton-copy" />
+        </div>
+        <div className="exercise-grid exercise-grid-view recommendation-track recommendation-track-skeleton">
+          {Array.from({ length: 3 }, (_, index) => (
+            <article className="exercise-card exercise-card-skeleton" key={index}>
+              <span className="skeleton-line exercise-skeleton-number" />
+              <span className="exercise-card-copy">
+                <span className="skeleton-line exercise-skeleton-title" />
+                <span className="skeleton-line exercise-skeleton-meta" />
+              </span>
+              <span className="skeleton-line exercise-skeleton-badge" />
+              <span className="skeleton-line exercise-skeleton-arrow" />
+            </article>
+          ))}
+        </div>
+      </section>
+      <section className="category-group explore-categories" aria-hidden="true">
+        <div className="explore-categories-heading">
+          <span className="skeleton-line explore-skeleton-title" />
+          <span className="skeleton-line explore-skeleton-copy" />
+        </div>
+        <div className="category-area-tabs">
+          {[6, 5, 6, 7, 4, 8, 4, 5].map((width, index) => (
+            <span className="skeleton-line category-tab-skeleton" style={{ width: `${width}rem` }} key={index} />
+          ))}
+        </div>
+        <div className="category-grid">
+          {Array.from({ length: 8 }, (_, index) => <CategoryCardSkeleton key={index} />)}
+        </div>
+      </section>
     </main>
   );
 }

@@ -499,6 +499,16 @@ label.file-picker-button:hover { color: white; background: var(--green-dark); }
 @media (min-width: 721px) and (max-width: 1050px) {
   .exercise-grid-view { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .exercise-workspace { grid-template-columns: minmax(0, 1fr) 250px; }
+  .explore-categories .category-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .explore-categories .category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .explore-categories-heading > div { align-items: flex-start; flex-direction: column; gap: .2rem; }
+}
+
+@media (max-width: 420px) {
+  .explore-categories .category-grid { grid-template-columns: 1fr; }
 }
 
 body { font-family: Georgia, "Times New Roman", serif; }
@@ -528,13 +538,38 @@ button, input, textarea { font: inherit; }
 .category-group { margin-bottom: 1rem; }
 .category-group h2 { margin: .35rem 0 .1rem; color: var(--ink); font-family: Georgia, serif; font-size: clamp(1.5rem, 2vw, 1.85rem); font-weight: 500; line-height: 1.15; }
 .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .8rem; }
+.explore-categories { margin-top: 1.35rem; }
+.explore-categories-heading { display: flex; align-items: baseline; gap: .9rem; margin-bottom: .55rem; }
+.explore-categories-heading > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: .85rem; }
+.explore-categories-heading h2 { margin: 0; color: var(--ink); font-family: Georgia, serif; font-size: clamp(1.5rem, 2vw, 1.85rem); font-weight: 500; line-height: 1.15; }
+.explore-categories-heading span { color: var(--muted); font-size: .82rem; }
+.category-area-tabs { display: flex; gap: .45rem; overflow-x: auto; padding: .1rem 0 .8rem; scrollbar-width: thin; }
+.category-area-tabs button { flex: 0 0 auto; padding: .45rem .9rem; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: transparent; font-size: .82rem; white-space: nowrap; }
+.category-area-tabs button:hover, .category-area-tabs button.active { border-color: var(--green); color: white; background: var(--green); }
+.explore-categories .category-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; }
 .category-card { display: grid; gap: .45rem; padding: 0 0 .9rem; border: 1px solid var(--line); background: var(--white); text-align: left; transition: border-color .2s ease, transform .2s ease; }
 .category-card:hover, .category-card:focus-visible { border-color: var(--green); transform: translateY(-3px); }
 .category-card strong, .category-card span, .category-card small { padding: 0 .9rem; }
 .category-card strong { color: var(--ink); font-family: Georgia, serif; font-size: 1.28rem; font-weight: 500; line-height: 1.2; }
 .category-card span, .category-card small { color: var(--muted); }
-.category-image, .category-fallback { width: 100%; height: 8.5rem; object-fit: cover; }
+.category-image, .category-fallback { display: block; width: 100%; height: 8.5rem; }
+.category-image { background-position: center; background-size: cover; }
 .category-fallback { display: block; background: linear-gradient(145deg, #1C6B59, #12483d 58%, #e66d4f); }
+.explore-categories .category-card { min-width: 0; min-height: 300px; grid-template-rows: auto auto 1fr auto; gap: .6rem; padding-bottom: .8rem; }
+.explore-categories .category-image, .explore-categories .category-fallback { height: 9rem; border-radius: 3px; object-fit: cover; }
+.explore-categories .category-card strong { font-size: 1.05rem; }
+.explore-categories .category-card > span:not(.category-fallback) { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: .85rem; line-height: 1.35; }
+.explore-categories .category-card > small { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: .76rem; }
+.explore-categories .category-card .category-card-arrow { padding: 0; color: var(--green); font-size: 1.15rem; }
+.recommendation-skeleton-heading { display: flex; align-items: center; gap: .85rem; margin: 0 0 1rem; }
+.recommendation-skeleton-title { display: block; width: 12rem; height: 1.5rem; }
+.recommendation-skeleton-copy { display: block; width: 14rem; height: .8rem; }
+.recommendation-track-skeleton .exercise-card-skeleton { min-width: 0; }
+.explore-skeleton-title { display: block; width: 11rem; height: 1.7rem; }
+.explore-skeleton-copy { display: block; width: 11rem; height: .8rem; }
+.category-area-tabs .category-tab-skeleton { display: block; flex: 0 0 auto; height: 2rem; border: 1px solid var(--line); border-radius: 999px; }
+.explore-categories .category-card-skeleton { min-height: 300px; grid-template-rows: auto auto 1fr auto; gap: .6rem; }
+.explore-categories .category-card-skeleton .category-skeleton-image { display: block; height: 9rem; padding: 0; border-radius: 3px; }
 .page-skeleton-title { display: block; width: min(16rem, 60vw); height: 2.6rem; }
 .page-skeleton-copy { display: block; width: min(28rem, 75vw); height: 1rem; margin-top: .55rem; }
 .category-group-skeleton-title { display: block; width: 12rem; height: 1.7rem; margin: .35rem 0; }
@@ -574,7 +609,14 @@ button, input, textarea { font: inherit; }
 .level-progress { display: block; height: .35rem; margin: .2rem .9rem 0; background: var(--line); }
 .level-progress span { display: block; height: 100%; padding: 0; background: var(--green); }
 .recommend-section { margin-bottom: 1rem; }
-.recommend-section .section-heading h2 { margin: .55rem 0; font-size: clamp(1.15rem, 2vw, 1.4rem); line-height: 1.3; }
+.recommend-section .section-heading h2 { margin: .35rem 0 .2rem; font-size: clamp(1.15rem, 2vw, 1.4rem); line-height: 1.3; }
+.recommendation-heading { gap: 1rem; }
+.recommendation-controls { display: flex; flex: 0 0 auto; gap: .4rem; padding-bottom: .45rem; }
+.recommendation-controls button { display: grid; width: 2rem; height: 2rem; place-items: center; padding: 0; border: 1px solid var(--green); border-radius: 50%; color: var(--green); background: var(--white); }
+.recommendation-controls button:hover:not(:disabled) { color: white; background: var(--green); }
+.recommendation-controls button:disabled { cursor: default; opacity: .4; }
+.recommendation-track { display: flex; overflow: hidden; scroll-behavior: smooth; scroll-snap-type: x mandatory; }
+.recommendation-track .exercise-card { flex: 0 0 min(19rem, 100%); scroll-snap-align: start; }
 .exercise-filters { align-items: end; justify-content: space-between; gap: .75rem 1rem; flex-wrap: wrap; width: 100%; border-bottom: 0; }
 .exercise-filters > div:first-child { padding-bottom: 0; }
 .exercise-filters .exercise-toolbar { align-items: end; flex: 1; min-width: 0; flex-wrap: wrap; }
