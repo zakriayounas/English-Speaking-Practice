@@ -126,8 +126,20 @@ export default function ProgressPage() {
                   <strong>{attempt.exerciseTitle}</strong>
                   <Link className="recent-attempt-retry" href={'/exercise/' + attempt.exerciseId}>Retry</Link>
                   <div className="recent-attempt-details">
-                    <span>{attempt.maxScore ? attempt.score + '/' + attempt.maxScore : 'Score unavailable'}</span>
-                    <span>{formatDuration(attempt.durationMs)}{formatTarget(attempt.targetSeconds) ? ' / ' + formatTarget(attempt.targetSeconds) : ''}</span>
+                    <span className="recent-attempt-metric">
+                      <svg className="clock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="m8 12 2.5 2.5L16 9" />
+                      </svg>
+                      Score: {attempt.maxScore ? attempt.score + '/' + attempt.maxScore : 'Unavailable'}
+                    </span>
+                    <span className="recent-attempt-metric">
+                      <svg className="clock-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                      </svg>
+                      Time: {formatDuration(attempt.durationMs)}{formatTarget(attempt.targetSeconds) ? ' / ' + formatTarget(attempt.targetSeconds) : ''}
+                    </span>
                     <span>{formatDate(attempt.submittedAt)}</span>
                   </div>
                 </div>
