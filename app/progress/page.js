@@ -7,7 +7,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'rec
 import { supabase } from '../../lib/supabase';
 import { useAppShell } from '../../components/AppShell';
 import { formatDate, formatDuration, formatPercent, formatTarget } from '../../lib/format';
-import { ProgressPageSkeleton } from '../../components/PageSkeletons';
+import { ProfileProgressSkeleton, ProgressPageSkeleton } from '../../components/PageSkeletons';
 
 export default function ProgressPage() {
   const router = useRouter();
